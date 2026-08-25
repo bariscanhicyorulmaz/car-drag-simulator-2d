@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerçekçi Drag Yarışı</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    overflow:hidden;
+    font-family:Arial,sans-serif;
+    background:#86cdf5;
+}
+
+#game{
+    width:100vw;
+    height:100vh;
+    position:relative;
+    overflow:hidden;
+}
+
+#sky{
+    position:absolute;
+    inset:0;
+    background:linear-gradient(#7ec8ff,#dff4ff);
+}
+
+.mountain{
+    position:absolute;
+    bottom:250px;
+    width:700px;
+    height:250px;
+    background:#6f8f66;
+    opacity:.75;
+    clip-path:polygon(0% 100%,50% 0%,100% 100%);
+}
+
+#road{
+    position:absolute;
+    bottom:0;
+    width:100%;
+    height:250px;
+    background:#474747;
+}
+
+.lane{
+    position:absolute;
+    top:120px;
+    width:140px;
+    height:10px;
+    background:white;
+}
+
+/* CAR */
+
+.car{
+    position:absolute;
+    width:220px;
+    height:90px;
+    z-index:20;
+}
+
+.body{
+    position:absolute;
+    width:220px;
+    height:42px;
+    left:0;
+    bottom:15px;
+
+    background:
+    linear-gradient(
+        to bottom,
+        #3a3a3a,
+        #050505
+    );
+
+    border-radius:18px 40px 12px 15px;
+
+    box-shadow:
+    inset 0 2px 10px rgba(255,255,255,.15),
+    0 12px 20px rgba(0,0,0,.5);
+}
+
+.roof{
+    position:absolute;
+    width:105px;
+    height:32px;
+    left:62px;
+    bottom:55px;
+    background:#1d1d1d;
+    border-radius:20px 20px 0 0;
+}
+
+.window{
+    position:absolute;
+    width:88px;
+    height:18px;
+    left:70px;
+    bottom:63px;
+    background:#92d8ff;
+    border-radius:8px;
+}
+
+.headlight{
+    position:absolute;
+    width:12px;
+    height:10px;
+    right:0;
+    bottom:40px;
+    background:#fff4ae;
+}
+
+.wheel{
+    position:absolute;
+    width:42px;
+    height:42px;
+    background:#111;
+    border:5px solid #666;
+    border-radius:50%;
+    bottom:0;
+}
+
+.left{
+    left:25px;
+}
+
+.right{
+    right:25px;
+}
+
+#car1{
+    bottom:135px;
+    transform:scaleX(-1);
+}
+
+#car2{
+    bottom:40px;
+    transform:scaleX(-1);
+}
+
+#hud{
+    position:absolute;
+    left:15px;
+    top:15px;
+    z-index:100;
+    background:rgba(0,0,0,.65);
+    color:white;
+    padding:15px;
+    border-radius:10px;
+    min-width:320px;
+}
+
+.line{
+    margin-bottom:5px;
+}
+
+.cam{
+    color:#ffd700;
+    margin-top:10px;
+}
+.carimg{
+    position:absolute;
+    width:350px;
+    z-index:20;
+    user-select:none;
+    pointer-events:none;
+}
+
+#car1{
+    bottom:100px;
+    transform:scaleX(-1);
+}
+
+#car2{
+    bottom:20px;
+    transform:scaleX(-1);
+}
+`
+</style>
+</head>
+<body>
+
+<div id="game">
+
+<div id="sky"></div>
+
+<div class="mountain" style="left:150px"></div>
+<div class="mountain" style="left:1200px"></div>
+<div class="mountain" style="left:2300px"></div>
+
+<div id="road"></div>
+
+<div id="hud">
+<div class="line">Araç 1 (W = Gaz / S = Fren-Geri)</div>
+<div class="line">Hız: <span id="speed1">0</span> km/h | Vites: <span id="gear1">N</span></div>
+<br>
+<div class="line">Araç 2 (A = Gaz / D = Fren-Geri)</div>
+<div class="line">Hız: <span id="speed2">0</span> km/h | Vites: <span id="gear2">N</span></div>
+<div class="line">
+Araçlar Arası Mesafe:
+<span id="distance">0</span> m
+</div>
+<div class="cam" id="camText">Kamera: Araç 1</div>
+</div>
+
+<img id="car1" class="carimg" src="bmwi7.png">
+
+<img id="car2" class="carimg" src="maybach.png">
+</div>
+
+<script>
+
+/* YOL */
+
+const road=document.getElementById("road");
+
+for(let i=0;i<80;i++){
+    const lane=document.createElement("div");
+    lane.className="lane";
+    lane.style.left=(i*200)+"px";
+    road.appendChild(lane);
+}
+
+/* KLAVYE */
+
+const keys={};
+
+document.addEventListener("keydown",(e)=>{
+
+    keys[e.key.toLowerCase()]=true;
+
+    if(e.key==="1"){
+        cameraTarget=car1;
+        camText.textContent="Kamera: Araç 1";
+    }
+
+    if(e.key==="2"){
+        cameraTarget=car2;
+        camText.textContent="Kamera: Araç 2";
+    }
+});
+
+document.addEventListener("keyup",(e)=>{
+    keys[e.key.toLowerCase()]=false;
+});
+
+/* VİTES ORANLARI */
+
+const bmwGears = [
+null,
+{ratio:4.8,max:25},
+{ratio:3.2,max:45},
+{ratio:2.2,max:75},
+{ratio:1.7,max:110},
+{ratio:1.2,max:150},
+{ratio:0.9,max:220}
+];
+
+const maybachGears = [
+null,
+{ratio:4.4,max:30},
+{ratio:3.0,max:55},
+{ratio:2.0,max:90},
+{ratio:1.5,max:130},
+{ratio:1.1,max:180},
+{ratio:0.85,max:240}
+];
+
+function createCar(multiplier=1,transmission=null){
+
+    return{
+        x:0,
+        speed:0,
+        gear:1,
+        rpm:1000,
+        maxForward:280,
+        maxReverse:-18,
+        powerMultiplier:multiplier,
+        transmission:transmission
+    };
+}
+
+const car1=createCar(
+1,
+bmwGears
+);
+
+const car2=createCar(
+1.10,
+maybachGears
+);
+
+car2.x=-100;
+
+let cameraTarget=car1;
+
+const car1El=document.getElementById("car1");
+const car2El=document.getElementById("car2");
+
+function physics(car,gas,brake){
+
+    const ratio =
+    car.transmission[
+    car.gear
+    ].ratio;
+
+    let engineForce=
+0.018*
+ratio*
+car.powerMultiplier;
+
+    /* GAZ */
+
+    if(gas){
+
+        if(car.speed<0){
+            car.speed+=0.12;
+        }else{
+            car.speed+=engineForce;
+        }
+    }
+
+    /* FREN + GERİ */
+
+    if(brake){
+
+        if(car.speed>2){
+
+            car.speed-=0.22;
+
+        }else{
+
+            car.speed-=0.09;
+
+        }
+    }
+
+    /* MOTOR FRENİ */
+
+    if(!gas && !brake){
+
+        if(car.speed>0){
+
+            car.speed-=0.015;
+
+            if(car.speed<0)
+                car.speed=0;
+        }
+
+        if(car.speed<0){
+
+            car.speed+=0.01;
+
+            if(car.speed>0)
+                car.speed=0;
+        }
+    }
+
+    /* OTOMATİK VİTES */
+
+    car.rpm =
+    800 +
+    Math.abs(car.speed)
+    *
+    ratio
+    *
+    140;
+
+    if(
+car.speed >
+car.transmission[
+car.gear
+].max
+&&
+car.gear < 6
+){
+    car.gear++;
+}
+
+if(
+car.gear > 1
+&&
+car.speed <
+(
+car.transmission[
+car.gear-1
+].max
+*0.65
+)
+){
+    car.gear--;
+}
+
+if(
+gas &&
+car.speed > 50 &&
+car.rpm < 2500 &&
+car.gear > 2
+){
+    car.gear -= 2;
+
+    if(car.gear < 1){
+        car.gear = 1;
+    }
+}
+
+if(
+!gas &&
+car.gear < 6 &&
+car.rpm > 1800
+){
+    car.gear++;
+}
+
+    car.speed=Math.min(car.maxForward,car.speed);
+    car.speed=Math.max(car.maxReverse,car.speed);
+
+    car.x+=car.speed;
+}
+
+function update(){
+
+    physics(
+        car1,
+        keys["w"],
+        keys["s"]
+    );
+
+    physics(
+        car2,
+        keys["a"],
+        keys["d"]
+    );
+
+    const camX=cameraTarget.x;
+
+    const focusX=
+    window.innerWidth*0.35;
+
+    car1El.style.left=
+    focusX+(car1.x-camX)+"px";
+
+    car2El.style.left=
+    focusX+(car2.x-camX)+"px";
+
+    document
+    .querySelectorAll(".lane")
+    .forEach((lane,i)=>{
+
+        let x=
+        ((i*200)-camX)%16000;
+
+        if(x<-200)
+            x+=16000;
+
+        lane.style.left=x+"px";
+    });
+
+    speed1.textContent=
+    Math.round(Math.abs(car1.speed)*3.6);
+
+    speed2.textContent=
+    Math.round(Math.abs(car2.speed)*3.6);
+
+    gear1.textContent=
+    car1.speed<0 ? "R" : car1.gear;
+
+    gear2.textContent=
+    car2.speed<0 ? "R" : car2.gear;
+    distance.textContent =
+    Math.round(
+        Math.abs(car1.x - car2.x)
+    );
+
+    requestAnimationFrame(update);
+}
+
+update();
+
+</script>
+
+</body>
+</html>
