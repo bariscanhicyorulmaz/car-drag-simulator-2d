@@ -3,6 +3,8 @@
 
 A browser-based 2D drag racing game built with pure HTML, CSS and JavaScript.
 
+!! TO BE ABLE TO PLAY, PUT THE 3 FILES INTO A FOLDER AND CLICK HTML.
+
 ## Features
 
 - Two playable vehicles
